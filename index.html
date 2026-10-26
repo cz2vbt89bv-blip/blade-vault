@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blade Vault</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#050914;color:#edf7ff;font-family:system-ui,Arial,sans-serif}
+header{padding:18px;background:#081426;border-bottom:1px solid #174c78;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0}
+h1{font-size:23px;margin:0;color:#45caff}
+.money{color:#64eaff;font-weight:900;font-size:19px}
+main{max-width:950px;margin:auto;padding:18px}
+.hero,.panel{background:linear-gradient(135deg,#10243b,#08111f);border:1px solid #20456b;border-radius:17px;padding:20px;margin-bottom:16px}
+.hero h2{font-size:30px;margin:5px 0}
+.muted{color:#91a9c5}
+.stats,.grid,.items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.stats{grid-template-columns:repeat(3,1fr);margin-top:18px}
+.stat{background:#071321;padding:12px;border-radius:10px;border:1px solid #1c3855}
+.stat small{display:block;color:#91a9c5}
+.stat strong{font-size:19px}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+button{border:1px solid #2477ad;border-radius:10px;background:#1165a8;color:white;font-weight:750;padding:11px 14px;font-size:14px;cursor:pointer}
+button:disabled{opacity:.4}
+button.secondary{background:#142238;border-color:#2b4561}
+button.sell{background:#08765e;border-color:#20b893}
+nav button.active{background:#1a83c9}
+h2{margin-top:0}
+.crate,.item{background:#0c192a;border:1px solid #24415f;border-radius:14px;padding:14px;min-width:0}
+.crate{text-align:center}
+.crate .icon{font-size:49px;padding:10px;text-shadow:0 0 20px var(--c)}
+.crate h3,.item h3{margin:5px 0}
+.price{font-size:19px;font-weight:900;color:var(--c)}
+.crate p,.item p{color:#91a9c5;font-size:13px}
+.crate button,.item button{width:100%;margin-top:8px}
+.item{text-align:center}
+.knife{font-size:40px;padding:12px;filter:drop-shadow(0 0 8px var(--c))}
+.rarity{color:var(--c);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1px}
+.progress{height:7px;background:#1b3047;border-radius:10px;overflow:hidden;margin-top:9px}
+.progress div{height:100%;background:#42caff}
+.hidden{display:none!important}
+#modal{position:fixed;inset:0;background:#020610ed;display:grid;place-items:center;padding:18px;z-index:5}
+.dialog{width:min(430px,100%);background:#0d1d31;border:1px solid #329fe5;border-radius:20px;text-align:center;padding:24px;position:relative}
+.reveal{font-size:76px;padding:18px;animation:glow 1s infinite alternate;filter:drop-shadow(0 0 17px var(--c))}
+@keyframes glow{from{transform:rotate(-10deg) scale(.92)}to{transform:rotate(8deg) scale(1.08)}}
+.actions{display:flex;gap:10px;margin-top:18px}.actions button{flex:1}
+#message{background:#10312d;border:1px solid #1a806c;border-radius:10px;padding:12px;margin:12px 0}
+@media(min-width:650px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.items{grid-template-columns:repeat(4,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header><h1>⚔ BLADE VAULT</h1><div class="money" id="topMoney">$100</div></header>
+<main>
+<section class="hero">
+<div style="color:#45caff;font-weight:bold;letter-spacing:2px">THE KNIFE COLLECTING GAME</div>
+<h2>ROLL. COLLECT. GET RICH.</h2>
+<p class="muted">Open crates, discover rare knives, and build your collection.</p>
+<div class="stats">
+<div class="stat"><small>Balance</small><strong id="money">$100</strong></div>
+<div class="stat"><small>Knives owned</small><strong id="owned">0</strong></div>
+<div class="stat"><small>Collection</small><strong id="count">0/45</strong></div>
+</div>
+</section>
+
+<div class="panel">
+<b>⏱ Next $100 income</b>
+<strong id="timer" style="float:right;color:#61e7ff">05:00</strong>
+<div class="progress"><div id="bar" style="width:0%"></div></div>
+<p class="muted">Earn $100 every 5 minutes, even while you're away.</p>
+</div>
+
+<nav>
+<button class="active" onclick="tab('crates',this)">📦 Crates</button>
+<button class="secondary" onclick="tab('inventory',this)">⚔ Inventory</button>
+<button class="secondary" onclick="tab('collection',this)">✦ Collection</button>
+</nav>
+<div id="message" class="hidden"></div>
+<section id="crates">
+<h2>Crate Market</h2>
+<div class="grid" id="crateGrid"></div>
+</section>
+<section id="inventory" class="hidden">
+<h2>Your Inventory</h2>
+<div class="items" id="inventoryGrid"></div>
+</section>
+<section id="collection" class="hidden">
+<h2>Collection Book</h2>
+<p class="muted">Discover all 45 unique knives.</p>
+<div class="items" id="collectionGrid"></div>
+</section>
+<p class="muted" style="text-align:center;font-size:12px">BLADE VAULT · Progress saves automatically on this device.</p>
+</main>
+<div id="modal" class="hidden"></div>
+<script>
+const tiers=[
+{name:"Common",key:"common",price:100,sell:35,color:"#b9c5d4",icon:"⚪",names:["Pocket Shard","Tin Fang","Blue Utility","Rust Edge","Street Spike","Carbon Mini","Frost Tip","Night Cutter","Steel Tanto","Training Blade"]},
+{name:"Uncommon",key:"uncommon",price:500,sell:150,color:"#4de19b",icon:"🟢",names:["Venom Edge","Jade Fang","Copperline","Reef Cutter","Circuit Knife","Moss Dagger","Neon Slice","Viper Point","Emerald Rush"]},
+{name:"Rare",key:"rare",price:1000,sell:400,color:"#43b9ff",icon:"🔵",names:["Arctic Strike","Voltage","Deep Current","Phantom Edge","Glacier Fang","Storm Splitter","Aqua Talon","Midnight Blue"]},
+{name:"Legendary",key:"legendary",price:5000,sell:2000,color:"#bd83ff",icon:"🟣",names:["Royal Rupture","Nova Saber","Void Carver","Kingslayer","Astral Edge","Thunder Crown","Eclipse Dagger"]},
+{name:"Mythic",key:"mythic",price:10000,sell:4500,color:"#ff70c8",icon:"🩷",names:["Starfall","Rift Reaper","Nebula Fang","Quantum Edge","Celestial Bite","Blackhole"]},
+{name:"Godly",key:"godly",price:50000,sell:25000,color:"#ffcf5b",icon:"🟡",names:["Genesis","Divine Ruin","Solar Sovereign","Infinity Edge","Vaultbreaker"]}
+];
+const knives=tiers.flatMap(t=>t.names.map((name,i)=>({id:t.key+i,name,rarity:t.name,key:t.key,price:t.price,sell:t.sell,color:t.color})));
+const lookup=Object.fromEntries(knives.map(k=>[k.id,k]));
+const SAVE="blade-vault-save-v2";
+function fresh(){return {money:100,inventory:[],collection:[],next:Date.now()+300000}}
+let state;
+try{
+ const saved=JSON.parse(localStorage.getItem(SAVE));
+ state=saved&&Array.isArray(saved.inventory)&&Array.isArray(saved.collection)?saved:fresh();
+}catch(e){state=fresh()}
+if(!Number.isFinite(state.next))state.next=Date.now()+300000;
+function save(){try{localStorage.setItem(SAVE,JSON.stringify(state))}catch(e){}}
+function cash(n){return "$"+Math.floor(n).toLocaleString("en-US")}
+function notify(s){const el=document.getElementById("message");el.textContent=s;el.classList.remove("hidden");}
+function tab(name,button){
+ ["crates","inventory","collection"].forEach(n=>document.getElementById(n).classList.toggle("hidden",n!==name));
+ document.querySelectorAll("nav button").forEach(b=>{b.classList.toggle("active",b===button);b.classList.toggle("secondary",b!==button)});
+ render();
+}
+function renderCrates(){
+ document.getElementById("crateGrid").innerHTML=tiers.map(t=>`
+ <article class="crate" style="--c:${t.color}">
+ <div class="icon">📦</div><h3>${t.name} Crate</h3>
+ <p>${t.names.length} possible knives</p><div class="price">${cash(t.price)}</div>
+ <button ${state.money<t.price?"disabled":""} onclick="openCrate('${t.key}')">Open Crate</button>
+ </article>`).join("");
+}
+function card(k,owned){
+ return `<article class="item" style="--c:${k.color}">
+ <div class="knife">🗡️</div><h3>${k.name}</h3>
+ <div class="rarity">${k.rarity}</div>
+ <p>${owned?"Sell value: "+cash(k.sell):"Discovered!"}</p>
+ ${owned?`<button class="sell" onclick="sellKnife('${k.id}')">Sell · ${cash(k.sell)}</button>`:""}
+ </article>`;
+}
+function render(){
+ document.getElementById("money").textContent=cash(state.money);
+ document.getElementById("topMoney").textContent=cash(state.money);
+ document.getElementById("owned").textContent=state.inventory.length;
+ document.getElementById("count").textContent=state.collection.length+"/45";
+ renderCrates();
+ if(!document.getElementById("inventory").classList.contains("hidden")){
+ document.getElementById("inventoryGrid").innerHTML=state.inventory.length?state.inventory.map(id=>lookup[id]).filter(Boolean).map(k=>card(k,true)).join(""):'<p class="muted">No knives yet. Open a crate!</p>';
+ }
+ if(!document.getElementById("collection").classList.contains("hidden")){
+ document.getElementById("collectionGrid").innerHTML=knives.map(k=>state.collection.includes(k.id)?card(k,false):`<article class="item" style="opacity:.5"><div class="knife">🔒</div><h3>Unknown Knife</h3><div class="rarity">???</div><p>Not discovered</p></article>`).join("");
+ }
+}
+function openCrate(key){
+ const t=tiers.find(x=>x.key===key);
+ if(!t||state.money<t.price)return;
+ state.money-=t.price;
+ const k=lookup[t.key+Math.floor(Math.random()*t.names.length)];
+ state.pending=k.id;save();render();
+ const modal=document.getElementById("modal");
+ modal.innerHTML=`<div class="dialog" style="--c:${k.color}">
+ <div style="color:#45caff;letter-spacing:2px;font-weight:bold">OPENING ${t.name.toUpperCase()} CRATE</div>
+ <div class="reveal">📦</div><h2>Unlocking your drop...</h2>
+ <div class="progress"><div id="spin" style="width:0%"></div></div></div>`;
+ modal.classList.remove("hidden");
+ let start=Date.now();
+ const timer=setInterval(()=>{
+ const percent=Math.min(100,(Date.now()-start)/1300*100);
+ const bar=document.getElementById("spin");if(bar)bar.style.width=percent+"%";
+ if(percent>=100){clearInterval(timer);reveal(k)}
+ },40);
+}
+function reveal(k){
+ const modal=document.getElementById("modal");
+ modal.innerHTML=`<div class="dialog" style="--c:${k.color}">
+ <div style="color:#45caff;font-weight:bold;letter-spacing:2px">✦ CRATE OPENED ✦</div>
+ <div class="reveal">🗡️</div><div class="rarity">${k.rarity}</div>
+ <h2>${k.name}</h2><p class="muted">Sell value: ${cash(k.sell)}</p>
+ <div class="actions"><button class="sell" onclick="finish('sell')">Sell</button><button onclick="finish('keep')">Keep</button></div>
+ </div>`;
+}
+function finish(choice){
+ const k=lookup[state.pending];if(!k)return;
+ if(choice==="sell"){state.money+=k.sell;notify(k.name+" sold for "+cash(k.sell)+".")}
+ else{state.inventory.push(k.id);if(!state.collection.includes(k.id))state.collection.push(k.id);notify(k.name+" added to your inventory!")}
+ state.pending=null;document.getElementById("modal").classList.add("hidden");save();render();
+}
+function sellKnife(id){
+ const i=state.inventory.indexOf(id);if(i<0)return;
+ state.inventory.splice(i,1);state.money+=lookup[id].sell;save();render();notify(lookup[id].name+" sold!");
+}
+function tick(){
+ const now=Date.now();
+ if(now>=state.next){
+ const n=Math.floor((now-state.next)/300000)+1;
+ state.money+=100*n;state.next+=n*300000;save();
+ notify("Income collected: +"+cash(n*100));
+ render();
+ }
+ const left=Math.max(0,state.next-Date.now()),s=Math.ceil(left/1000);
+ document.getElementById("timer").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+ document.getElementById("bar").style.width=((300000-left)/300000*100)+"%";
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)tick()});
+window.addEventListener("pagehide",save);
+render();tick();setInterval(tick,1000);
+</script>
+</body>
+</html>
